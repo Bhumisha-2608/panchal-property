@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #0a0a0c;
+  --color-card: #121217;
+  --color-card-border: #1f1f2e;
+  --color-accent: #d4af37;
+  --color-accent-hover: #e5c158;
+}
+
+body {
+  background-color: #0a0a0c;
+  color: #f3f4f6;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}

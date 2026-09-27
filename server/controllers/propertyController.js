@@ -18,9 +18,10 @@ exports.getProperties = async (req, res) => {
       };
     });
 
-    res.status(200).json(normalizedData);
+    return res.status(200).json(normalizedData);
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error('GET PROPERTIES ERROR:', error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -36,7 +37,7 @@ exports.getPropertyById = async (req, res) => {
     let imgList = doc.images || doc.imageUrls || doc.imageUrl || [];
     if (typeof imgList === 'string') imgList = [imgList];
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: {
         ...doc,
@@ -44,7 +45,8 @@ exports.getPropertyById = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error('GET PROPERTY BY ID ERROR:', error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -53,7 +55,7 @@ exports.createProperty = async (req, res) => {
   try {
     let finalImages = [];
 
-    // Parse existing text URLs if sent in body
+    // 1. Parse existing text URLs if sent in body
     if (req.body.images) {
       finalImages = Array.isArray(req.body.images)
         ? req.body.images
@@ -64,31 +66,40 @@ exports.createProperty = async (req, res) => {
         : [req.body.imageUrls];
     }
 
-    // Process files handled by Multer
+    // 2. Process files handled by Multer
     if (req.files && req.files.length > 0) {
-      const fileUrls = req.files.map((file) => file.path || file.secure_url || file.url);
+      // Filter valid URLs from Multer Cloudinary Storage
+      const fileUrls = req.files
+        .map((file) => file.path || file.secure_url || file.url)
+        .filter(Boolean);
 
-      // Fallback manual upload if buffer is present (memory storage)
-      if (!fileUrls[0] && req.files[0].buffer) {
-        const uploadPromises = req.files.map((file) => {
-          return new Promise((resolve, reject) => {
-            const stream = cloudinary.uploader.upload_stream(
-              { folder: 'panchal_properties' },
-              (error, result) => {
-                if (error) return reject(error);
-                resolve(result.secure_url);
-              }
-            );
-            stream.end(file.buffer);
+      // Fallback manual upload if buffer is present (memory storage fallback)
+      if (fileUrls.length === 0 && req.files[0]?.buffer) {
+        try {
+          const uploadPromises = req.files.map((file) => {
+            return new Promise((resolve, reject) => {
+              const stream = cloudinary.uploader.upload_stream(
+                { folder: 'panchal_properties' },
+                (error, result) => {
+                  if (error) return reject(error);
+                  resolve(result.secure_url);
+                }
+              );
+              stream.end(file.buffer);
+            });
           });
-        });
-        const uploadedUrls = await Promise.all(uploadPromises);
-        finalImages = [...finalImages, ...uploadedUrls];
+          const uploadedUrls = await Promise.all(uploadPromises);
+          finalImages = [...finalImages, ...uploadedUrls];
+        } catch (uploadErr) {
+          console.error('Cloudinary Stream Upload Failed:', uploadErr);
+          // Non-blocking fallback: proceed with property creation even if stream upload fails
+        }
       } else {
         finalImages = [...finalImages, ...fileUrls];
       }
     }
 
+    // 3. Normalize availability flags
     const isAvailableVal =
       req.body.isAvailable !== undefined
         ? req.body.isAvailable === 'true' || req.body.isAvailable === true
@@ -96,6 +107,7 @@ exports.createProperty = async (req, res) => {
         ? !(req.body.isSold === 'true' || req.body.isSold === true)
         : true;
 
+    // 4. Construct property document payload
     const propertyData = {
       ...req.body,
       title: req.body.title || 'Untitled Property',
@@ -114,11 +126,21 @@ exports.createProperty = async (req, res) => {
       images: finalImages,
     };
 
+    // 5. Save to Database
     const property = await Property.create(propertyData);
-    res.status(201).json({ success: true, data: property });
+
+    // 6. Explicit return with 201 status code
+    return res.status(201).json({
+      success: true,
+      message: 'Property published successfully',
+      data: property,
+    });
   } catch (error) {
     console.error('CREATE PROPERTY ERROR:', error);
-    res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to create property',
+    });
   }
 };
 
@@ -154,9 +176,11 @@ exports.updateProperty = async (req, res) => {
         : [incomingImages];
     }
 
-    // Append newly uploaded images on update if any
+    // Append newly uploaded images on update
     if (req.files && req.files.length > 0) {
-      const newUrls = req.files.map((file) => file.path || file.secure_url || file.url);
+      const newUrls = req.files
+        .map((file) => file.path || file.secure_url || file.url)
+        .filter(Boolean);
       updateData.images = [...(updateData.images || []), ...newUrls];
     }
 
@@ -170,13 +194,13 @@ exports.updateProperty = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Property not found' });
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: updatedProperty,
     });
   } catch (error) {
     console.error('UPDATE PROPERTY ERROR:', error);
-    res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -187,8 +211,9 @@ exports.deleteProperty = async (req, res) => {
     if (!property) {
       return res.status(404).json({ success: false, message: 'Property not found' });
     }
-    res.status(200).json({ success: true, message: 'Property deleted successfully' });
+    return res.status(200).json({ success: true, message: 'Property deleted successfully' });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error('DELETE PROPERTY ERROR:', error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };

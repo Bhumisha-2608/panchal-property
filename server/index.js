@@ -8,25 +8,18 @@ const propertyRoutes = require('./routes/propertyRoutes');
 
 const app = express();
 
-// Configure CORS middleware (handles regular requests AND preflight OPTIONS automatically)
+// Explicitly handle CORS preflight for all origins
 app.use(
   cors({
-    origin: [
-      'http://localhost:5173',
-      'http://localhost:3000',
-      'http://127.0.0.1:5173',
-      'https://panchal-property.vercel.app',
-      /\.vercel\.app$/ // Allows all Vercel deployment preview links
-    ],
+    origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
-    credentials: true,
   })
 );
 
 // Middleware for parsing JSON and Form Data
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Database Connection
 mongoose

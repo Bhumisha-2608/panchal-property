@@ -67,13 +67,12 @@ exports.createProperty = async (req, res) => {
     }
 
     // 2. Process files handled by Multer
-    if (req.files && req.files.length > 0) {
-      // Filter valid URLs from Multer Cloudinary Storage
+    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
       const fileUrls = req.files
         .map((file) => file.path || file.secure_url || file.url)
         .filter(Boolean);
 
-      // Fallback manual upload if buffer is present (memory storage fallback)
+      // Fallback manual upload if memory storage buffer is present
       if (fileUrls.length === 0 && req.files[0]?.buffer) {
         try {
           const uploadPromises = req.files.map((file) => {
@@ -92,12 +91,14 @@ exports.createProperty = async (req, res) => {
           finalImages = [...finalImages, ...uploadedUrls];
         } catch (uploadErr) {
           console.error('Cloudinary Stream Upload Failed:', uploadErr);
-          // Non-blocking fallback: proceed with property creation even if stream upload fails
         }
       } else {
         finalImages = [...finalImages, ...fileUrls];
       }
     }
+
+    // Filter out potential empty strings or null items
+    finalImages = finalImages.filter((img) => typeof img === 'string' && img.trim().length > 0);
 
     // 3. Normalize availability flags
     const isAvailableVal =
@@ -107,9 +108,8 @@ exports.createProperty = async (req, res) => {
         ? !(req.body.isSold === 'true' || req.body.isSold === true)
         : true;
 
-    // 4. Construct property document payload
+    // 4. Construct sanitized property document payload (avoid raw req.body key collision)
     const propertyData = {
-      ...req.body,
       title: req.body.title || 'Untitled Property',
       price: req.body.price ? String(req.body.price) : '0',
       priceUnit: req.body.priceUnit || 'Lakh',
@@ -177,7 +177,7 @@ exports.updateProperty = async (req, res) => {
     }
 
     // Append newly uploaded images on update
-    if (req.files && req.files.length > 0) {
+    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
       const newUrls = req.files
         .map((file) => file.path || file.secure_url || file.url)
         .filter(Boolean);

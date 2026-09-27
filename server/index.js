@@ -8,14 +8,9 @@ const propertyRoutes = require('./routes/propertyRoutes');
 
 const app = express();
 
-// Explicitly handle CORS preflight for all origins
-app.use(
-  cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
-  })
-);
+// Enable CORS for ALL origins and handle preflight OPTIONS
+app.use(cors());
+app.options('*', cors());
 
 // Middleware for parsing JSON and Form Data
 app.use(express.json({ limit: '50mb' }));

@@ -1,6 +1,5 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const cors = require('cors');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
@@ -8,9 +7,17 @@ const propertyRoutes = require('./routes/propertyRoutes');
 
 const app = express();
 
-// Enable CORS for ALL origins and handle preflight OPTIONS
-app.use(cors());
-app.options('*', cors());
+// Custom Manual CORS Middleware (Guarantees headers on all GET, POST, and OPTIONS requests)
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
 
 // Middleware for parsing JSON and Form Data
 app.use(express.json({ limit: '50mb' }));
@@ -33,6 +40,7 @@ app.get('/', (req, res) => {
 // Global Error Handler Middleware
 app.use((err, req, res, next) => {
   console.error('Server Error Log:', err.stack || err.message || err);
+  res.header('Access-Control-Allow-Origin', '*');
   res.status(500).json({
     success: false,
     message: err.message || 'Internal Server Error',
